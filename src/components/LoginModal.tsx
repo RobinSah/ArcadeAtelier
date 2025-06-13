@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { X, User, Shield, LogIn, UserPlus, Eye, EyeOff, CheckCircle, AlertCircle, Mail, Phone, Building } from 'lucide-react';
+import { supabase } from '../config/supabase';
+
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -96,53 +98,44 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call
-      // Example API call structure:
-      /*
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: loginData.email,
-          password: loginData.password,
-          userType: userType
-        }),
+      // Sign in with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password
       });
 
-      if (!response.ok) {
-        throw new Error('Login failed');
+      if (authError) throw authError;
+
+      // Get user profile to determine user type
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('user_type, is_active')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError) {
+        throw new Error('Unable to load user profile. Please contact support.');
       }
 
-      const data = await response.json();
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('userType', data.userType);
-      */
-
-      // Simulate API call for demo
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Demo login validation
-      const demoCredentials = {
-        customer: { email: 'demo@customer.com', password: 'demo123' },
-        admin: { email: 'admin@company.com', password: 'admin123' }
-      };
-
-      const validCredentials = demoCredentials[userType];
-      if (loginData.email === validCredentials.email && loginData.password === validCredentials.password) {
-        setSubmitStatus('success');
-        setTimeout(() => {
-          onLogin(userType);
-          onClose();
-          resetForms();
-        }, 1000);
-      } else {
-        throw new Error('Invalid credentials');
+      if (!profile.is_active) {
+        throw new Error('Your account has been deactivated. Please contact support.');
       }
+
+      // Check if user type matches selected type
+      if (profile.user_type !== userType) {
+        throw new Error(`This account is registered as a ${profile.user_type}. Please select the correct account type.`);
+      }
+
+      setSubmitStatus('success');
+      setTimeout(() => {
+        onLogin(profile.user_type);
+        onClose();
+        resetForms();
+      }, 1000);
 
     } catch (error) {
-      setErrorMessage('Invalid email or password. Please try again.');
+      console.error('Login error:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Login failed. Please try again.');
       setSubmitStatus('error');
       setTimeout(() => setSubmitStatus('idle'), 3000);
     } finally {
@@ -157,40 +150,80 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call
-      // Example API call structure:
-      /*
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...registerData,
-          userType: userType
-        }),
-      });
+      // Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('user_profiles')
+        .select('email')
+        .eq('email', registerData.email)
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
+      if (existingUser) {
+        throw new Error('An account with this email already exists. Please try logging in instead.');
       }
 
-      const data = await response.json();
-      */
+      // Sign up with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: registerData.email,
+        password: registerData.password,
+        options: {
+          data: {
+            first_name: registerData.firstName,
+            last_name: registerData.lastName,
+            user_type: userType,
+            phone: registerData.phone,
+            company: registerData.company
+          }
+        }
+      });
 
-      // Simulate API call for demo
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (authError) throw authError;
+
+      if (!authData.user) {
+        throw new Error('Registration failed. Please try again.');
+      }
+
+      // Create user profile (this should be handled by the database trigger, but let's ensure it exists)
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert([
+          {
+            id: authData.user.id,
+            email: registerData.email,
+            first_name: registerData.firstName,
+            last_name: registerData.lastName,
+            phone: registerData.phone,
+            company: registerData.company,
+            user_type: userType,
+            is_active: true
+          }
+        ]);
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        // Don't throw here as the user is created, just log the error
+      }
 
       setSubmitStatus('success');
-      setTimeout(() => {
-        // Auto-login after successful registration
-        onLogin(userType);
-        onClose();
-        resetForms();
-      }, 2000);
+      
+      // Check if email confirmation is required
+      if (!authData.session) {
+        setErrorMessage('Please check your email and click the confirmation link to activate your account.');
+        setTimeout(() => {
+          setMode('login');
+          setSubmitStatus('idle');
+          setErrorMessage('');
+        }, 5000);
+      } else {
+        // Auto-login if no email confirmation required
+        setTimeout(() => {
+          onLogin(userType);
+          onClose();
+          resetForms();
+        }, 2000);
+      }
 
     } catch (error) {
+      console.error('Registration error:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Registration failed. Please try again.');
       setSubmitStatus('error');
       setTimeout(() => setSubmitStatus('idle'), 3000);
@@ -214,6 +247,8 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     setMode('login');
     setSubmitStatus('idle');
     setErrorMessage('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const handleClose = () => {
@@ -307,7 +342,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start space-x-3">
               <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
               <p className="text-green-700 text-sm">
-                {mode === 'login' ? 'Login successful! Redirecting...' : 'Account created successfully! Logging you in...'}
+                {mode === 'login' ? 'Login successful! Redirecting...' : 'Account created successfully!'}
               </p>
             </div>
           )}
@@ -574,17 +609,6 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
                   </>
                 )}
               </button>
-            </div>
-          )}
-
-          {/* Demo Credentials - Only show for login mode */}
-          {mode === 'login' && (
-            <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-blue-700 text-sm font-medium mb-2">Demo Credentials:</p>
-              <div className="text-xs text-blue-600 space-y-1">
-                <p><strong>Customer:</strong> demo@customer.com / demo123</p>
-                <p><strong>Admin:</strong> admin@company.com / admin123</p>
-              </div>
             </div>
           )}
         </div>

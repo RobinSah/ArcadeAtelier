@@ -8,6 +8,7 @@ import ResourcesPage from './components/ResourcesPage';
 import PricingPage from './components/PricingPage';
 import LoginModal from './components/LoginModal';
 
+
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [userType, setUserType] = useState<'guest' | 'customer' | 'admin'>('guest');
