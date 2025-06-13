@@ -1,38 +1,51 @@
-// This should be created as a backend API route
-// For Next.js: pages/api/send-slack-notification.js or app/api/send-slack-notification/route.js
-// For Express: app.post('/api/send-slack-notification', ...)
-// For Netlify: netlify/functions/send-slack-notification.js
+// netlify/functions/send-slack-notification.js
+const https = require('https');
+const url = require('url');
 
-export default async function handler(req, res) {
-  // Handle CORS for development
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+exports.handler = async (event, context) => {
+  // Handle CORS preflight
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
   }
 
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method Not Allowed' }),
+    };
   }
 
   try {
-    const { orderData, customerData } = req.body;
+    const { orderData, customerData } = JSON.parse(event.body);
 
     if (!orderData) {
-      res.status(400).json({ error: 'Order data is required' });
-      return;
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Order data is required' }),
+      };
     }
 
-    const webhookUrl = process.env.SLACK_WEBHOOK_URL; // Note: No VITE_ prefix for backend
+    const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
     if (!webhookUrl) {
       console.error('Slack webhook URL not configured');
-      res.status(500).json({ error: 'Slack webhook not configured' });
-      return;
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Slack webhook not configured' }),
+      };
     }
 
     const formatDate = (dateString) => {
@@ -67,6 +80,7 @@ export default async function handler(req, res) {
       'as-built-drawings': 'As-Built Drawings'
     };
 
+    // Create the Slack message
     const message = {
       text: `🎉 New Order Received! Order #${orderData.order_number}`,
       blocks: [
@@ -176,24 +190,68 @@ export default async function handler(req, res) {
       ]
     });
 
-    // Send to Slack
-    const slackResponse = await fetch(webhookUrl, {
+    // Send to Slack using native https module (more reliable in Netlify)
+    const slackUrl = url.parse(webhookUrl);
+    const postData = JSON.stringify(message);
+
+    const options = {
+      hostname: slackUrl.hostname,
+      port: 443,
+      path: slackUrl.path,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(message)
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const slackResponse = await new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode,
+            body: data
+          });
+        });
+      });
+
+      req.on('error', (error) => {
+        reject(error);
+      });
+
+      req.write(postData);
+      req.end();
     });
 
-    if (!slackResponse.ok) {
-      throw new Error(`Slack API error: ${slackResponse.status}`);
+    if (slackResponse.statusCode !== 200) {
+      throw new Error(`Slack API error: ${slackResponse.statusCode}`);
     }
 
     console.log('✅ Slack notification sent successfully');
-    res.status(200).json({ success: true, message: 'Slack notification sent successfully' });
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ 
+        success: true, 
+        message: 'Slack notification sent successfully' 
+      }),
+    };
 
   } catch (error) {
     console.error('❌ Failed to send Slack notification:', error);
-    res.status(500).json({ success: false, error: error.message });
+    
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+    };
   }
-}
+};
