@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Shield, LogIn } from 'lucide-react';
+import { X, User, Shield, LogIn, UserPlus, Eye, EyeOff, CheckCircle, AlertCircle, Mail, Phone, Building } from 'lucide-react';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -8,125 +8,585 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [userType, setUserType] = useState<'customer' | 'admin'>('customer');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Login form data
+  const [loginData, setLoginData] = useState({
+    email: '',
+    password: '',
+    rememberMe: false
+  });
+
+  // Registration form data
+  const [registerData, setRegisterData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    company: '',
+    password: '',
+    confirmPassword: '',
+    agreeToTerms: false
+  });
 
   if (!isOpen) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    onLogin(userType);
+  const handleLoginInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setLoginData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleRegisterInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setRegisterData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const validateLogin = () => {
+    if (!loginData.email || !loginData.password) {
+      setErrorMessage('Please fill in all required fields');
+      return false;
+    }
+    if (!/\S+@\S+\.\S+/.test(loginData.email)) {
+      setErrorMessage('Please enter a valid email address');
+      return false;
+    }
+    return true;
+  };
+
+  const validateRegistration = () => {
+    if (!registerData.firstName || !registerData.lastName || !registerData.email || !registerData.password) {
+      setErrorMessage('Please fill in all required fields');
+      return false;
+    }
+    if (!/\S+@\S+\.\S+/.test(registerData.email)) {
+      setErrorMessage('Please enter a valid email address');
+      return false;
+    }
+    if (registerData.password.length < 8) {
+      setErrorMessage('Password must be at least 8 characters long');
+      return false;
+    }
+    if (registerData.password !== registerData.confirmPassword) {
+      setErrorMessage('Passwords do not match');
+      return false;
+    }
+    if (!registerData.agreeToTerms) {
+      setErrorMessage('Please agree to the terms and conditions');
+      return false;
+    }
+    return true;
+  };
+
+  const handleLogin = async () => {
+    setErrorMessage('');
+    if (!validateLogin()) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // TODO: Replace with actual API call
+      // Example API call structure:
+      /*
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginData.email,
+          password: loginData.password,
+          userType: userType
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('userType', data.userType);
+      */
+
+      // Simulate API call for demo
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Demo login validation
+      const demoCredentials = {
+        customer: { email: 'demo@customer.com', password: 'demo123' },
+        admin: { email: 'admin@company.com', password: 'admin123' }
+      };
+
+      const validCredentials = demoCredentials[userType];
+      if (loginData.email === validCredentials.email && loginData.password === validCredentials.password) {
+        setSubmitStatus('success');
+        setTimeout(() => {
+          onLogin(userType);
+          onClose();
+          resetForms();
+        }, 1000);
+      } else {
+        throw new Error('Invalid credentials');
+      }
+
+    } catch (error) {
+      setErrorMessage('Invalid email or password. Please try again.');
+      setSubmitStatus('error');
+      setTimeout(() => setSubmitStatus('idle'), 3000);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setErrorMessage('');
+    if (!validateRegistration()) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // TODO: Replace with actual API call
+      // Example API call structure:
+      /*
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...registerData,
+          userType: userType
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed');
+      }
+
+      const data = await response.json();
+      */
+
+      // Simulate API call for demo
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      setSubmitStatus('success');
+      setTimeout(() => {
+        // Auto-login after successful registration
+        onLogin(userType);
+        onClose();
+        resetForms();
+      }, 2000);
+
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Registration failed. Please try again.');
+      setSubmitStatus('error');
+      setTimeout(() => setSubmitStatus('idle'), 3000);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetForms = () => {
+    setLoginData({ email: '', password: '', rememberMe: false });
+    setRegisterData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      company: '',
+      password: '',
+      confirmPassword: '',
+      agreeToTerms: false
+    });
+    setMode('login');
+    setSubmitStatus('idle');
+    setErrorMessage('');
+  };
+
+  const handleClose = () => {
+    resetForms();
     onClose();
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-8 w-full max-w-md border border-gray-200 shadow-xl">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">Login</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* User Type Selection */}
-        <div className="flex space-x-2 mb-8 bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setUserType('customer')}
-            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
-              userType === 'customer'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-            }`}
-          >
-            <User size={16} />
-            <span>Customer</span>
-          </button>
-          <button
-            onClick={() => setUserType('admin')}
-            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
-              userType === 'admin'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-            }`}
-          >
-            <Shield size={16} />
-            <span>Admin</span>
-          </button>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors duration-200"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors duration-200"
-              required
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center space-x-2 text-gray-600">
-              <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <span>Remember me</span>
-            </label>
-            <button type="button" className="text-blue-600 hover:text-blue-700 transition-colors duration-200">
-              Forgot password?
+      <div className="bg-white rounded-2xl w-full max-w-md border border-gray-200 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-2xl font-bold text-gray-900">
+              {mode === 'login' ? 'Welcome Back' : 'Create Account'}
+            </h3>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-100 rounded-lg"
+              disabled={isSubmitting}
+            >
+              <X size={24} />
             </button>
           </div>
 
-          <button
-            type="submit"
-            className={`w-full flex items-center justify-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-sm ${
-              userType === 'customer'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-purple-600 hover:bg-purple-700 text-white'
-            }`}
-          >
-            <LogIn size={16} />
-            <span>Login as {userType === 'customer' ? 'Customer' : 'Admin'}</span>
-          </button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <div className="text-center">
-            <p className="text-gray-500 text-sm mb-4">Don't have an account?</p>
-            <button className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200">
-              Create New Account
+          {/* Mode Toggle */}
+          <div className="flex space-x-2 mb-8 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setMode('login')}
+              className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                mode === 'login'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              disabled={isSubmitting}
+            >
+              <LogIn size={16} />
+              <span>Login</span>
+            </button>
+            <button
+              onClick={() => setMode('register')}
+              className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                mode === 'register'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              disabled={isSubmitting}
+            >
+              <UserPlus size={16} />
+              <span>Register</span>
             </button>
           </div>
-        </div>
 
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-blue-700 text-sm font-medium mb-2">Demo Credentials:</p>
-          <div className="text-xs text-blue-600 space-y-1">
-            <p><strong>Customer:</strong> demo@customer.com / demo123</p>
-            <p><strong>Admin:</strong> admin@company.com / admin123</p>
+          {/* User Type Selection */}
+          <div className="flex space-x-2 mb-8 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setUserType('customer')}
+              className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                userType === 'customer'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+              }`}
+              disabled={isSubmitting}
+            >
+              <User size={16} />
+              <span>Customer</span>
+            </button>
+            <button
+              onClick={() => setUserType('admin')}
+              className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                userType === 'admin'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+              }`}
+              disabled={isSubmitting}
+            >
+              <Shield size={16} />
+              <span>Admin</span>
+            </button>
           </div>
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <p className="text-red-700 text-sm">{errorMessage}</p>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {submitStatus === 'success' && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start space-x-3">
+              <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
+              <p className="text-green-700 text-sm">
+                {mode === 'login' ? 'Login successful! Redirecting...' : 'Account created successfully! Logging you in...'}
+              </p>
+            </div>
+          )}
+
+          {/* Login Form */}
+          {mode === 'login' ? (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  <Mail className="inline mr-2" size={16} />
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={loginData.email}
+                  onChange={handleLoginInputChange}
+                  placeholder="Enter your email"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200"
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    value={loginData.password}
+                    onChange={handleLoginInputChange}
+                    placeholder="Enter your password"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200 pr-12"
+                    disabled={isSubmitting}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isSubmitting}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center space-x-2 text-gray-600">
+                  <input 
+                    type="checkbox" 
+                    name="rememberMe"
+                    checked={loginData.rememberMe}
+                    onChange={handleLoginInputChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                    disabled={isSubmitting}
+                  />
+                  <span>Remember me</span>
+                </label>
+                <button 
+                  type="button" 
+                  className="text-blue-600 hover:text-blue-700 transition-colors duration-200"
+                  disabled={isSubmitting}
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              <button
+                onClick={handleLogin}
+                disabled={isSubmitting}
+                className={`w-full flex items-center justify-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  userType === 'customer'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={16} />
+                    <span>Login as {userType === 'customer' ? 'Customer' : 'Admin'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            /* Registration Form */
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={registerData.firstName}
+                    onChange={handleRegisterInputChange}
+                    placeholder="First name"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200"
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Last Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={registerData.lastName}
+                    onChange={handleRegisterInputChange}
+                    placeholder="Last name"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200"
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  <Mail className="inline mr-2" size={16} />
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={registerData.email}
+                  onChange={handleRegisterInputChange}
+                  placeholder="Enter your email"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200"
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  <Phone className="inline mr-2" size={16} />
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={registerData.phone}
+                  onChange={handleRegisterInputChange}
+                  placeholder="Enter your phone number"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  <Building className="inline mr-2" size={16} />
+                  Company Name
+                </label>
+                <input
+                  type="text"
+                  name="company"
+                  value={registerData.company}
+                  onChange={handleRegisterInputChange}
+                  placeholder="Enter your company name"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    value={registerData.password}
+                    onChange={handleRegisterInputChange}
+                    placeholder="Create a password (min. 8 characters)"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200 pr-12"
+                    disabled={isSubmitting}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isSubmitting}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Confirm Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    name="confirmPassword"
+                    value={registerData.confirmPassword}
+                    onChange={handleRegisterInputChange}
+                    placeholder="Confirm your password"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors duration-200 pr-12"
+                    disabled={isSubmitting}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isSubmitting}
+                  >
+                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  name="agreeToTerms"
+                  checked={registerData.agreeToTerms}
+                  onChange={handleRegisterInputChange}
+                  className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  disabled={isSubmitting}
+                  required
+                />
+                <label className="text-sm text-gray-600 leading-relaxed">
+                  I agree to the <button type="button" className="text-blue-600 hover:text-blue-700 underline">Terms of Service</button> and <button type="button" className="text-blue-600 hover:text-blue-700 underline">Privacy Policy</button>
+                </label>
+              </div>
+
+              <button
+                onClick={handleRegister}
+                disabled={isSubmitting}
+                className={`w-full flex items-center justify-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                  userType === 'customer'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={16} />
+                    <span>Create {userType === 'customer' ? 'Customer' : 'Admin'} Account</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Demo Credentials - Only show for login mode */}
+          {mode === 'login' && (
+            <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-blue-700 text-sm font-medium mb-2">Demo Credentials:</p>
+              <div className="text-xs text-blue-600 space-y-1">
+                <p><strong>Customer:</strong> demo@customer.com / demo123</p>
+                <p><strong>Admin:</strong> admin@company.com / admin123</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

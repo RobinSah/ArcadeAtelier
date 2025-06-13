@@ -103,14 +103,14 @@ function App() {
               <h4 className="text-gray-900 font-semibold mb-4">Contact</h4>
               <ul className="space-y-2 text-gray-600">
                 <li>support@arcadeatelier.com</li>
-                <li>+1 (555) 123-4567</li>
+                <li>+1 (571) 604-9012</li>
                 <li>24/7 Support Available</li>
               </ul>
             </div>
           </div>
           
           <div className="border-t border-gray-200 mt-8 pt-8 text-center text-gray-500">
-            <p>&copy; 2024 ArcadeAtelier. All rights reserved.</p>
+            <p>&copy; 2025 ArcadeAtelier. All rights reserved.</p>
           </div>
         </div>
       </footer>
