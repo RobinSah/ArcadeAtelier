@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import HomePage from './components/HomePage';
 import ServicesPage from './components/ServicesPage';
@@ -7,21 +7,57 @@ import AboutPage from './components/AboutPage';
 import ResourcesPage from './components/ResourcesPage';
 import PricingPage from './components/PricingPage';
 import LoginModal from './components/LoginModal';
-
+import { supabase } from './config/supabase';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [userType, setUserType] = useState<'guest' | 'customer' | 'admin'>('guest');
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for existing authentication session on app load
+  useEffect(() => {
+    checkAuthState();
+  }, []);
+
+  const checkAuthState = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Get user profile to determine user type
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('user_type')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile?.user_type) {
+          setUserType(profile.user_type);
+          // Don't auto-navigate to dashboard, keep current page
+        }
+      }
+    } catch (error) {
+      console.error('Error checking auth state:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = (type: 'customer' | 'admin') => {
     setUserType(type);
     setCurrentPage('dashboard');
+    setShowLoginModal(false);
   };
 
-  const handleLogout = () => {
-    setUserType('guest');
-    setCurrentPage('home');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUserType('guest');
+      setCurrentPage('home');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
   };
 
   const handlePageChange = (page: string) => {
@@ -32,24 +68,47 @@ function App() {
     }
   };
 
+  // New function to handle "Start Your Project" button clicks
+  const handleStartProject = () => {
+    if (userType !== 'guest') {
+      // User is authenticated, go to dashboard
+      setCurrentPage('dashboard');
+    } else {
+      // User is not authenticated, show login modal
+      setShowLoginModal(true);
+    }
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <HomePage onPageChange={handlePageChange} onLogin={() => setShowLoginModal(true)} />;
+        return <HomePage onPageChange={handlePageChange} onLogin={handleStartProject} />;
       case 'services':
-        return <ServicesPage onLogin={() => setShowLoginModal(true)} />;
+        return <ServicesPage onLogin={handleStartProject} />;
       case 'dashboard':
-        return userType !== 'guest' ? <Dashboard userType={userType} /> : <HomePage onPageChange={handlePageChange} onLogin={() => setShowLoginModal(true)} />;
+        return userType !== 'guest' ? <Dashboard userType={userType} /> : <HomePage onPageChange={handlePageChange} onLogin={handleStartProject} />;
       case 'about':
-        return <AboutPage onLogin={() => setShowLoginModal(true)} />;
+        return <AboutPage onLogin={handleStartProject} />;
       case 'resources':
         return <ResourcesPage />;
       case 'pricing':
-        return <PricingPage onLogin={() => setShowLoginModal(true)} />;
+        return <PricingPage onLogin={handleStartProject} />;
       default:
-        return <HomePage onPageChange={handlePageChange} onLogin={() => setShowLoginModal(true)} />;
+        return <HomePage onPageChange={handlePageChange} onLogin={handleStartProject} />;
     }
   };
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

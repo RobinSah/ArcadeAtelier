@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, User, Shield, LogIn, UserPlus, Eye, EyeOff, CheckCircle, AlertCircle, Mail, Phone, Building } from 'lucide-react';
 import { supabase } from '../config/supabase';
 
@@ -91,146 +91,166 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     return true;
   };
 
-  const handleLogin = async () => {
-    setErrorMessage('');
-    if (!validateLogin()) return;
+  // Only showing the changed functions - rest of the component stays the same
 
-    setIsSubmitting(true);
+// Update these specific functions in your LoginModal.tsx:
 
-    try {
-      // Sign in with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: loginData.email,
-        password: loginData.password
-      });
+const handleLogin = async () => {
+  setErrorMessage('');
+  if (!validateLogin()) return;
 
-      if (authError) throw authError;
+  setIsSubmitting(true);
 
-      // Get user profile to determine user type
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('user_type, is_active')
-        .eq('id', authData.user.id)
-        .single();
+  try {
+    // Sign in with Supabase
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: loginData.email,
+      password: loginData.password
+    });
 
-      if (profileError) {
-        throw new Error('Unable to load user profile. Please contact support.');
-      }
+    if (authError) throw authError;
 
-      if (!profile.is_active) {
-        throw new Error('Your account has been deactivated. Please contact support.');
-      }
+    // Get user profile to determine user type
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('user_type, is_active')
+      .eq('id', authData.user.id)
+      .single();
 
-      // Check if user type matches selected type
-      if (profile.user_type !== userType) {
-        throw new Error(`This account is registered as a ${profile.user_type}. Please select the correct account type.`);
-      }
-
-      setSubmitStatus('success');
-      setTimeout(() => {
-        onLogin(profile.user_type);
-        onClose();
-        resetForms();
-      }, 1000);
-
-    } catch (error) {
-      console.error('Login error:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Login failed. Please try again.');
-      setSubmitStatus('error');
-      setTimeout(() => setSubmitStatus('idle'), 3000);
-    } finally {
-      setIsSubmitting(false);
+    if (profileError) {
+      throw new Error('Unable to load user profile. Please contact support.');
     }
-  };
 
-  const handleRegister = async () => {
-    setErrorMessage('');
-    if (!validateRegistration()) return;
+    if (!profile.is_active) {
+      throw new Error('Your account has been deactivated. Please contact support.');
+    }
 
-    setIsSubmitting(true);
+    // Check if user type matches selected type
+    if (profile.user_type !== userType) {
+      throw new Error(`This account is registered as a ${profile.user_type}. Please select the correct account type.`);
+    }
 
-    try {
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('user_profiles')
-        .select('email')
-        .eq('email', registerData.email)
-        .single();
+    setSubmitStatus('success');
+    
+    // Clear forms immediately after successful login
+    resetForms();
+    
+    setTimeout(() => {
+      onLogin(profile.user_type);
+      onClose();
+    }, 1000);
 
-      if (existingUser) {
-        throw new Error('An account with this email already exists. Please try logging in instead.');
-      }
+  } catch (error) {
+    console.error('Login error:', error);
+    setErrorMessage(error instanceof Error ? error.message : 'Login failed. Please try again.');
+    setSubmitStatus('error');
+    setTimeout(() => setSubmitStatus('idle'), 3000);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
-      // Sign up with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: registerData.email,
-        password: registerData.password,
-        options: {
-          data: {
-            first_name: registerData.firstName,
-            last_name: registerData.lastName,
-            user_type: userType,
-            phone: registerData.phone,
-            company: registerData.company
-          }
+const handleRegister = async () => {
+  setErrorMessage('');
+  if (!validateRegistration()) return;
+
+  setIsSubmitting(true);
+
+  try {
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('user_profiles')
+      .select('email')
+      .eq('email', registerData.email)
+      .single();
+
+    if (existingUser) {
+      throw new Error('An account with this email already exists. Please try logging in instead.');
+    }
+
+    // Sign up with Supabase
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: registerData.email,
+      password: registerData.password,
+      options: {
+        data: {
+          first_name: registerData.firstName,
+          last_name: registerData.lastName,
+          user_type: userType,
+          phone: registerData.phone,
+          company: registerData.company
         }
-      });
-
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error('Registration failed. Please try again.');
       }
+    });
 
-      // Create user profile (this should be handled by the database trigger, but let's ensure it exists)
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .upsert([
-          {
-            id: authData.user.id,
-            email: registerData.email,
-            first_name: registerData.firstName,
-            last_name: registerData.lastName,
-            phone: registerData.phone,
-            company: registerData.company,
-            user_type: userType,
-            is_active: true
-          }
-        ]);
+    if (authError) throw authError;
 
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        // Don't throw here as the user is created, just log the error
-      }
-
-      setSubmitStatus('success');
-      
-      // Check if email confirmation is required
-      if (!authData.session) {
-        setErrorMessage('Please check your email and click the confirmation link to activate your account.');
-        setTimeout(() => {
-          setMode('login');
-          setSubmitStatus('idle');
-          setErrorMessage('');
-        }, 5000);
-      } else {
-        // Auto-login if no email confirmation required
-        setTimeout(() => {
-          onLogin(userType);
-          onClose();
-          resetForms();
-        }, 2000);
-      }
-
-    } catch (error) {
-      console.error('Registration error:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Registration failed. Please try again.');
-      setSubmitStatus('error');
-      setTimeout(() => setSubmitStatus('idle'), 3000);
-    } finally {
-      setIsSubmitting(false);
+    if (!authData.user) {
+      throw new Error('Registration failed. Please try again.');
     }
-  };
+
+    // Create user profile
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .upsert([
+        {
+          id: authData.user.id,
+          email: registerData.email,
+          first_name: registerData.firstName,
+          last_name: registerData.lastName,
+          phone: registerData.phone,
+          company: registerData.company,
+          user_type: userType,
+          is_active: true
+        }
+      ]);
+
+    if (profileError) {
+      console.error('Profile creation error:', profileError);
+    }
+
+    setSubmitStatus('success');
+    
+    // Clear forms immediately after successful registration
+    resetForms();
+    
+    // Check if email confirmation is required
+    if (!authData.session) {
+      setErrorMessage('Please check your email and click the confirmation link to activate your account.');
+      setTimeout(() => {
+        setMode('login');
+        setSubmitStatus('idle');
+        setErrorMessage('');
+      }, 5000);
+    } else {
+      // Auto-login if no email confirmation required
+      setTimeout(() => {
+        onLogin(userType);
+        onClose();
+      }, 2000);
+    }
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    setErrorMessage(error instanceof Error ? error.message : 'Registration failed. Please try again.');
+    setSubmitStatus('error');
+    setTimeout(() => setSubmitStatus('idle'), 3000);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+// Add this new function to clear forms when modal opens
+const handleModalOpen = () => {
+  if (isOpen) {
+    resetForms();
+  }
+};
+
+// Add this useEffect to clear forms when modal opens
+useEffect(() => {
+  handleModalOpen();
+}, [isOpen]);
 
   const resetForms = () => {
     setLoginData({ email: '', password: '', rememberMe: false });
